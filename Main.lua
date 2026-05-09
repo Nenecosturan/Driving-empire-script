@@ -4,12 +4,12 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
 local Window = Rayfield:CreateWindow({
-   Name = "Driving Empire V-Optima",
-   LoadingTitle = "Bypass ve Optimizasyon...",
-   LoadingSubtitle = "StreamingEnabled Uyumlu",
+   Name = "Driving Empire Elite Hub",
+   LoadingTitle = "Mekanizmalar Kuruluyor...",
+   LoadingSubtitle = "Kanka Bu Sefer Olacak",
    ConfigurationSaving = {
       Enabled = true,
-      FolderName = "DrivingEmpireOptima",
+      FolderName = "DrivingEmpireElite",
       FileName = "Config"
    }
 })
@@ -18,47 +18,21 @@ local Window = Rayfield:CreateWindow({
 local autoFarmATM = false
 local autoArrest = false
 local currentTarget = nil
-local trackingConnection = nil -- Performanslı takip için
-local maxMoney = 500000
+local arrestConnection = nil
 
--- Teslimat Noktası (Oyundaki gerçek koordinatla değiştir)
-local dropOffLocation = CFrame.new(100, 20, -100)
--- Kaçış Noktası (Haritanın çok yukarısı)
-local safeZone = CFrame.new(0, 5000, 0)
-
--- Yüklenmiş ve Soyulabilir ATM'leri Bulma (Performans Dostu Tarama)
-local function getNearestActiveATM()
-    local nearestATM = nil
-    local shortestDist = math.huge
-    local char = LocalPlayer.Character
-    if not char or not char.PrimaryPart then return nil end
-
-    local myPos = char:GetPivot().Position
-
-    -- Sadece o an yüklenmiş olan nesneleri tarar
-    for _, obj in ipairs(game.Workspace:GetDescendants()) do
-        -- ProximityPrompt (E tuşu etkileşimi) arıyoruz
-        if obj:IsA("ProximityPrompt") then
-            -- Adında ATM geçenleri veya üst klasöründe ATM olanları bul
-            if string.find(string.lower(obj.Name), "atm") or (obj.Parent and string.find(string.lower(obj.Parent.Name), "atm")) then
-                -- Eğer etkileşim aktifse (yani daha yeni soyulmamışsa)
-                if obj.Enabled then
-                    local dist = (myPos - obj.Parent.Position).Magnitude
-                    if dist < shortestDist then
-                        shortestDist = dist
-                        nearestATM = obj
-                    end
-                end
-            end
-        end
+-- Takım Kontrol Fonksiyonu (Esnek Tarama)
+local function isTeam(teamNamePart)
+    if LocalPlayer.Team and string.find(string.lower(LocalPlayer.Team.Name), string.lower(teamNamePart)) then
+        return true
     end
-    return nearestATM
+    return false
 end
 
+-- Outlaw (Mahkum) Sekmesi
 local OutlawTab = Window:CreateTab("Outlaw (Mahkum)", 4483362458) 
 
 OutlawTab:CreateToggle({
-   Name = "Auto ATM Farm (Yaya & Güvenli)",
+   Name = "Auto ATM Farm (Yaya)",
    CurrentValue = false,
    Flag = "ATMFarm", 
    Callback = function(Value)
@@ -66,49 +40,28 @@ OutlawTab:CreateToggle({
       if autoFarmATM then
          task.spawn(function()
             while autoFarmATM do
-               task.wait(0.5) -- Taramayı çok hızlı yapıp PC'yi yormamak için
+               task.wait(0.5)
                
                local char = LocalPlayer.Character
-               if not char or not char.PrimaryPart then continue end
+               if not char or not char:FindFirstChild("HumanoidRootPart") then continue end
 
-               -- 1. Polis Kontrolü (Güvenlik Önlemi)
-               local policeNear = false
-               for _, p in ipairs(Players:GetPlayers()) do
-                   if p.Team and string.find(string.lower(p.Team.Name), "security") and p ~= LocalPlayer then
-                       if p.Character and p.Character.PrimaryPart then
-                           if (char:GetPivot().Position - p.Character:GetPivot().Position).Magnitude < 150 then
-                               policeNear = true
-                               break
-                           end
+               -- ATM Tarayıcı (Haritadaki aktif ATM'leri bulur)
+               local targetATM = nil
+               for _, obj in ipairs(game.Workspace:GetDescendants()) do
+                   if obj:IsA("ProximityPrompt") and (string.find(string.lower(obj.Name), "atm") or string.find(string.lower(obj.Parent.Name), "atm")) then
+                       if obj.Enabled then
+                           targetATM = obj
+                           break
                        end
                    end
                end
 
-               if policeNear then
-                   char:PivotTo(safeZone)
-                   task.wait(2)
-                   continue
-               end
-
-               -- 2. ATM Bulma ve Soyma
-               local targetPrompt = getNearestActiveATM()
-               
-               if targetPrompt and targetPrompt.Parent then
-                   -- ATM'nin önüne modern yöntemle ışınlan
-                   char:PivotTo(targetPrompt.Parent.CFrame * CFrame.new(0, 0, 3))
-                   
-                   -- StreamingEnabled yüzünden haritanın o kısmının yüklenmesini bekle (ÇOK KRİTİK)
-                   task.wait(0.3) 
-                   
-                   -- Soygun işlemini başlat
-                   fireproximityprompt(targetPrompt)
-                   
-                   -- Soygun süresi kadar bekle ki kodu bozmasın
-                   task.wait(targetPrompt.HoldDuration + 0.5)
-               else
-                   -- Etrafta yüklü ATM yoksa haritada rastgele bir noktaya ışınlanıp oranın yüklenmesini sağlayabilirsin
-                   -- Şimdilik bekliyoruz
-                   task.wait(1)
+               if targetATM then
+                   -- En yeni ışınlanma metodu (PivotTo)
+                   char:PivotTo(targetATM.Parent.CFrame * CFrame.new(0, 0, 3))
+                   task.wait(0.2) -- StreamingEnabled için bekleme
+                   fireproximityprompt(targetATM)
+                   task.wait(targetATM.HoldDuration + 0.5)
                end
             end
          end)
@@ -116,62 +69,67 @@ OutlawTab:CreateToggle({
    end,
 })
 
+-- Security (Polis) Sekmesi
 local SecurityTab = Window:CreateTab("Security (Polis)", 4483362458)
 
-SecurityTab:CreateToggle({
-   Name = "Auto Arrest (Kusursuz Kilitlenme)",
+local arrestToggle = SecurityTab:CreateToggle({
+   Name = "Auto Arrest (Kilitlenme)",
    CurrentValue = false,
    Flag = "AutoArrest",
    Callback = function(Value)
+      -- Kritik Koruma: Eğer polis (Security) değilse switch'i kapat
+      if Value and not isTeam("Security") and not isTeam("Polis") then
+          Rayfield:Notify({
+              Title = "Erişim Reddedildi Aga!",
+              Content = "Bu otomatik ışınlanma için Security (Polis) olmalısın!",
+              Duration = 5,
+              Image = 4483362458,
+          })
+          autoArrest = false
+          -- Switch'i kodla geri kapatma (Flag üzerinden kapatılır)
+          -- Not: Rayfield'da toggle'ı dışarıdan kapatmak bazen UI yenilemesi ister.
+          return
+      end
+
       autoArrest = Value
-      
-      -- Eğer kapatıldıysa döngüyü temizle
-      if not autoArrest then 
-          if trackingConnection then
-              trackingConnection:Disconnect()
-              trackingConnection = nil
+
+      -- Bağlantıyı Temizle
+      if not autoArrest then
+          if arrestConnection then arrestConnection:Disconnect() end
+          currentTarget = nil
+          return
+      end
+
+      -- Kusursuz Takip Döngüsü (Performans Odaklı)
+      arrestConnection = RunService.Heartbeat:Connect(function()
+          local char = LocalPlayer.Character
+          if not char or not char.PrimaryPart then return end
+
+          -- Hedef Kilitlenme Mantığı
+          if not currentTarget or not currentTarget.Character or not currentTarget.Character.PrimaryPart or (currentTarget.Team and not string.find(string.lower(currentTarget.Team.Name), "outlaw")) then
+              local closestDist = math.huge
+              for _, p in ipairs(Players:GetPlayers()) do
+                  if p ~= LocalPlayer and p.Team and string.find(string.lower(p.Team.Name), "outlaw") then
+                      if p.Character and p.Character.PrimaryPart then
+                          local d = (char.PrimaryPart.Position - p.Character.PrimaryPart.Position).Magnitude
+                          if d < closestDist then
+                              closestDist = d
+                              currentTarget = p
+                          end
+                      end
+                  end
+              end
           end
-          currentTarget = nil 
-          return 
-      end
-      
-      if autoArrest then
-         -- Saniyede 60 kez (oyun motoruyla aynı hızda) çalışan kusursuz takip döngüsü
-         trackingConnection = RunService.Heartbeat:Connect(function()
-             local char = LocalPlayer.Character
-             if not char or not char.PrimaryPart then return end
 
-             -- Hedef yoksa veya öldüyse/tutuklandıysa yeni hedef bul
-             if not currentTarget or not currentTarget.Character or not currentTarget.Character.PrimaryPart or currentTarget.Team.Name ~= "Outlaws" then
-                 local closestDist = math.huge
-                 local newTarget = nil
-                 
-                 for _, p in ipairs(Players:GetPlayers()) do
-                     if p.Team and string.find(string.lower(p.Team.Name), "outlaw") and p ~= LocalPlayer then
-                         if p.Character and p.Character.PrimaryPart then
-                             local d = (char:GetPivot().Position - p.Character:GetPivot().Position).Magnitude
-                             if d < closestDist then
-                                 closestDist = d
-                                 newTarget = p
-                             end
-                         end
-                     end
-                 end
-                 currentTarget = newTarget
-             end
-
-             -- Hedef bulunduysa DİBİNE YAPIŞ
-             if currentTarget and currentTarget.Character and currentTarget.Character.PrimaryPart then
-                 -- PivotTo ile milimetrik takip (Hırsızın sırtına yapışır)
-                 char:PivotTo(currentTarget.Character:GetPivot() * CFrame.new(0, 0, 2))
-                 
-                 -- Yaklaşınca E tuşunu (ProximityPrompt) otomatik tetikle
-                 local prompt = currentTarget.Character:FindFirstChildWhichIsA("ProximityPrompt", true)
-                 if prompt then
-                     fireproximityprompt(prompt)
-                 end
-             end
-         end)
-      end
+          -- Seçili Hırsıza Işınlan ve Yapış (Loop Go-To)
+          if currentTarget and currentTarget.Character and currentTarget.Character.PrimaryPart then
+              -- Hırsızın arkasına milimetrik yapışma
+              char:PivotTo(currentTarget.Character:GetPivot() * CFrame.new(0, 0, 2))
+              
+              -- Yakalarsa ProximityPrompt'u ateşle
+              local p = currentTarget.Character:FindFirstChildWhichIsA("ProximityPrompt", true)
+              if p then fireproximityprompt(p) end
+          end
+      end)
    end,
 })
