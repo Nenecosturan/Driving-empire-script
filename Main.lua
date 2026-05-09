@@ -4,12 +4,12 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
 local Window = Rayfield:CreateWindow({
-   Name = "Driving Empire - Phantom Security",
-   LoadingTitle = "No-Clip ve Radar Yükleniyor...",
-   LoadingSubtitle = "Engel Tanımayan Takip",
+   Name = "Driving Empire - Global Arrest",
+   LoadingTitle = "Sınırlar Kaldırılıyor...",
+   LoadingSubtitle = "Dünyalar Arası Işınlanma Aktif",
    ConfigurationSaving = {
       Enabled = true,
-      FolderName = "DE_Security",
+      FolderName = "DE_GlobalSecurity",
       FileName = "Config"
    }
 })
@@ -29,11 +29,10 @@ local arrestConnection = nil
 local noclipConnection = nil
 
 -- ==========================================
--- NO-CLIP MEKANİZMASI (Duvar ve Su İçin)
+-- NO-CLIP MEKANİZMASI (Hayalet Modu)
 -- ==========================================
 local function toggleNoclip(state)
     if state then
-        -- Fizik motorunun her karesinde çarpışmaları kapatır
         noclipConnection = RunService.Stepped:Connect(function()
             if LocalPlayer.Character then
                 for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
@@ -48,7 +47,6 @@ local function toggleNoclip(state)
             noclipConnection:Disconnect()
             noclipConnection = nil
         end
-        -- Çarpışmaları geri aç
         if LocalPlayer.Character then
             for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
                 if part:IsA("BasePart") then
@@ -60,12 +58,12 @@ local function toggleNoclip(state)
 end
 
 -- ==========================================
--- SECURITY (POLİS) SEKMESİ - GELİŞMİŞ SÜRÜM
+-- SECURITY (POLİS) SEKMESİ - SINIRSIZ SÜRÜM
 -- ==========================================
 local SecurityTab = Window:CreateTab("Security (Polis)", 4483362458)
 
 SecurityTab:CreateToggle({
-   Name = "Auto Arrest (No-Clip & Global)",
+   Name = "Auto Arrest (Sınırsız Global Takip)",
    CurrentValue = false,
    Flag = "AutoArrest",
    Callback = function(Value)
@@ -73,7 +71,7 @@ SecurityTab:CreateToggle({
       if Value and not (checkTeam(LocalPlayer, "security") or checkTeam(LocalPlayer, "police")) then
           Rayfield:Notify({
               Title = "Yetki Reddedildi!",
-              Content = "Kanka bu Terminatör modunu açmak için Polis olman lazım.",
+              Content = "Kanka bu global modu açmak için Security veya Polis olman lazım.",
               Duration = 4
           })
           autoArrest = false
@@ -81,7 +79,7 @@ SecurityTab:CreateToggle({
       end
 
       autoArrest = Value
-      toggleNoclip(Value) -- Takip açılınca No-Clip de açılır
+      toggleNoclip(Value) -- No-Clip her zaman aktif
 
       if not autoArrest then
           if arrestConnection then arrestConnection:Disconnect() end
@@ -89,21 +87,23 @@ SecurityTab:CreateToggle({
           return
       end
 
-      -- KUSURSUZ TAKİP DÖNGÜSÜ
+      -- KUSURSUZ VE SINIRSIZ TAKİP DÖNGÜSÜ
       arrestConnection = RunService.Heartbeat:Connect(function()
           local char = LocalPlayer.Character
           if not char or not char.PrimaryPart then return end
 
-          -- 1. Hedef Belirleme (Artık Denizin Altını Veya Void'i Umursamıyoruz)
-          if not currentTarget or not currentTarget.Character or not currentTarget.Character.PrimaryPart or not (checkTeam(currentTarget, "outlaw") or checkTeam(currentTarget, "criminal")) then
+          -- 1. Hedef Belirleme: Filtrelerin hepsi kaldırıldı!
+          if not currentTarget or not currentTarget.Character or not (checkTeam(currentTarget, "outlaw") or checkTeam(currentTarget, "criminal")) then
               local closestDist = math.huge
               local newTarget = nil
               
               for _, p in ipairs(Players:GetPlayers()) do
                   if p ~= LocalPlayer and (checkTeam(p, "outlaw") or checkTeam(p, "criminal")) then
-                      if p.Character and p.Character.PrimaryPart then
-                          -- Kanka artık Magnitude > 10 kontrolünü sildik, denizin dibinde de olsa gidiyoruz
-                          local d = (char.PrimaryPart.Position - p.Character.PrimaryPart.Position).Magnitude
+                      if p.Character then
+                          -- PrimaryPart'ı beklemeden direkt GetPivot kullanıyoruz (Yüklenmemiş oyuncuları bile bulur)
+                          local targetPos = p.Character:GetPivot().Position
+                          local d = (char:GetPivot().Position - targetPos).Magnitude
+                          
                           if d < closestDist then
                               closestDist = d
                               newTarget = p
@@ -111,15 +111,25 @@ SecurityTab:CreateToggle({
                       end
                   end
               end
-              currentTarget = newTarget
+              
+              -- Yeni hedef bulduğunda sağ altta sana haber versin
+              if newTarget and newTarget ~= currentTarget then
+                  Rayfield:Notify({
+                      Title = "Hedef Kilitlendi!",
+                      Content = newTarget.Name .. " adlı oyuncuya gidiliyor (Mesafe: " .. math.floor(closestDist) .. " stud)",
+                      Duration = 2
+                  })
+                  currentTarget = newTarget
+              end
           end
 
-          -- 2. Enseden Takip ve Yakalama
-          if currentTarget and currentTarget.Character and currentTarget.Character.PrimaryPart then
-              -- No-Clip sayesinde duvarın içine ışınlanman sorun olmayacak
-              char:PivotTo(currentTarget.Character:GetPivot() * CFrame.new(0, 0, 2.5))
+          -- 2. Işınlanma ve Yakalama (Deniz altı, duvar içi fark etmez)
+          if currentTarget and currentTarget.Character then
+              -- Hedefin direkt 2.5 stüd arkasına yapış (Menzil sıkıntısı olmaması için)
+              local tCFrame = currentTarget.Character:GetPivot()
+              char:PivotTo(tCFrame * CFrame.new(0, 0, 2.5))
               
-              -- Yakalama butonu (ProximityPrompt)
+              -- Yakalama butonu taraması (Zorla tetikleme)
               local prompt = currentTarget.Character:FindFirstChildWhichIsA("ProximityPrompt", true)
               if prompt then 
                   fireproximityprompt(prompt, 1) 
