@@ -4,30 +4,33 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
 local Window = Rayfield:CreateWindow({
-   Name = "Driving Empire Elite",
-   LoadingTitle = "Mekanikler Taranıyor...",
-   LoadingSubtitle = "Güvenli Işınlanma Aktif",
+   Name = "Driving Empire Ultimate",
+   LoadingTitle = "Sistem Derleniyor...",
+   LoadingSubtitle = "Hatasız Sürüm Aga",
    ConfigurationSaving = {
       Enabled = true,
-      FolderName = "DrivingEmpire",
+      FolderName = "DrivingEmpireUlt",
       FileName = "Config"
    }
 })
 
--- Takım Kontrolü (Mahkum veya Polis mi?)
-local function isTeam(teamNamePart)
-    if LocalPlayer.Team and string.find(string.lower(LocalPlayer.Team.Name), string.lower(teamNamePart)) then
-        return true
+-- Takım Kontrol Fonksiyonu (Esnek ve Hata Vermez)
+local function checkTeam(player, keyword)
+    if player and player.Team then
+        return string.find(string.lower(player.Team.Name), string.lower(keyword)) ~= nil
     end
     return false
 end
 
+-- Değişkenler
 local autoFarmATM = false
 local autoArrest = false
 local currentTarget = nil
 local arrestConnection = nil
 
--- Mahkum Sekmesi
+-- ==========================================
+-- OUTLAW (MAHKUM) SEKMESİ
+-- ==========================================
 local OutlawTab = Window:CreateTab("Outlaw (Mahkum)", 4483362458) 
 
 OutlawTab:CreateToggle({
@@ -39,41 +42,49 @@ OutlawTab:CreateToggle({
       if autoFarmATM then
          task.spawn(function()
             while autoFarmATM do
-               task.wait(1) -- Sistemi yormamak için 1 saniye bekleme
+               task.wait(1.5) -- Sistemi ve oyunu yormamak için ideal süre
                
                local char = LocalPlayer.Character
-               if not char or not char:FindFirstChild("HumanoidRootPart") then continue end
+               if not char or not char.PrimaryPart then continue end
 
                local targetATM = nil
-               local shortest = math.huge
+               local shortestDist = math.huge
                local myPos = char:GetPivot().Position
 
-               -- Gelişmiş ATM Tarayıcı (Haritadaki tüm E tuşlarını tarar)
+               -- Haritadaki ATM'leri güvenli şekilde (GetPivot ile) tara
                for _, obj in ipairs(game.Workspace:GetDescendants()) do
                    if obj:IsA("ProximityPrompt") then
-                       -- Adında veya ekrandaki yazısında ATM, Rob, Cash kelimeleri geçiyorsa algıla
-                       local nameMatch = string.find(string.lower(obj.Name), "atm") or string.find(string.lower(obj.Parent.Name), "atm")
-                       local textMatch = string.find(string.lower(obj.ActionText), "rob") or string.find(string.lower(obj.ObjectText), "atm") or string.find(string.lower(obj.ActionText), "hack")
+                       local nameMatch = string.find(string.lower(obj.Name), "atm") or (obj.Parent and string.find(string.lower(obj.Parent.Name), "atm"))
+                       local textMatch = string.find(string.lower(obj.ActionText), "rob") or string.find(string.lower(obj.ActionText), "hack") or string.find(string.lower(obj.ObjectText), "atm")
                        
-                       if (nameMatch or textMatch) and obj.Enabled then
-                           local dist = (myPos - obj.Parent.Position).Magnitude
-                           -- Eğer ATM okyanusun dibinde (0,0,0) değilse kabul et
-                           if obj.Parent.Position.Magnitude > 50 and dist < shortest then
-                               shortest = dist
-                               targetATM = obj
+                       if (nameMatch or textMatch) and obj.Enabled and obj.Parent then
+                           -- .Position yerine GetPivot() kullanarak çökme hatasını %100 engelledik
+                           local atmPos = obj.Parent:GetPivot().Position
+                           
+                           -- Okyanus dibi (0,0,0) koruması: Yüklenmemiş objeleri yoksay
+                           if atmPos.Magnitude > 10 then 
+                               local dist = (myPos - atmPos).Magnitude
+                               if dist < shortestDist then
+                                   shortestDist = dist
+                                   targetATM = obj
+                               end
                            end
                        end
                    end
                end
 
-               if targetATM then
-                   -- Anti-Cheat'i tetiklememek için biraz yukarıdan ışınlanıyoruz
-                   char:PivotTo(targetATM.Parent.CFrame * CFrame.new(0, 2, 3))
-                   task.wait(0.5) -- Haritanın o kısmının yüklenmesi için kesinlikle beklenmeli
+               if targetATM and targetATM.Parent then
+                   -- ATM'nin biraz havada ve önüne ışınlan (Anti-cheat takılmasın diye)
+                   char:PivotTo(targetATM.Parent:GetPivot() * CFrame.new(0, 2, 3))
+                   task.wait(0.5) -- Haritanın yüklenmesi için kritik bekleme süresi
                    fireproximityprompt(targetATM)
-                   task.wait(targetATM.HoldDuration + 1)
+                   task.wait(targetATM.HoldDuration + 0.5)
                else
-                   print("Şu an etrafta aktif/yüklü bir ATM bulunamadı.")
+                   Rayfield:Notify({
+                       Title = "ATM Bulunamadı", 
+                       Content = "Kanka etrafta yüklü ATM yok. Lütfen arabanla biraz haritayı dolaş ki ATM'ler hafızaya yüklensin.", 
+                       Duration = 3
+                   })
                end
             end
          end)
@@ -81,21 +92,22 @@ OutlawTab:CreateToggle({
    end,
 })
 
--- Polis Sekmesi
+-- ==========================================
+-- SECURITY (POLİS) SEKMESİ
+-- ==========================================
 local SecurityTab = Window:CreateTab("Security (Polis)", 4483362458)
 
 SecurityTab:CreateToggle({
-   Name = "Auto Arrest",
+   Name = "Auto Arrest (Kilitlenme)",
    CurrentValue = false,
    Flag = "AutoArrest",
    Callback = function(Value)
-      -- Polis değilse anında uyar ve engelle
-      if Value and not isTeam("Security") and not isTeam("Police") then
+      -- Polis misin kontrolü
+      if Value and not (checkTeam(LocalPlayer, "security") or checkTeam(LocalPlayer, "police")) then
           Rayfield:Notify({
-              Title = "Hop Aga Dur!",
-              Content = "Bu otomatik ışınlanmayı kullanmak için Security/Polis takımında olmalısın.",
-              Duration = 4,
-              Image = 4483362458,
+              Title = "Erişim Reddedildi!",
+              Content = "Aga bu özelliği açmak için Security veya Polis takımında olman lazım.",
+              Duration = 4
           })
           autoArrest = false
           return
@@ -109,38 +121,43 @@ SecurityTab:CreateToggle({
           return
       end
 
-      -- RunService ile FPS düşürmeyen mükemmel takip
+      -- Kusursuz Go-To ve Kilitlenme Döngüsü
       arrestConnection = RunService.Heartbeat:Connect(function()
           local char = LocalPlayer.Character
           if not char or not char.PrimaryPart then return end
 
-          -- Yeni Hedef Bulma
-          if not currentTarget or not currentTarget.Character or not currentTarget.Character.PrimaryPart or currentTarget.Team.Name ~= "Outlaws" then
+          -- 1. Geçerli Bir Hedef Bul
+          if not currentTarget or not currentTarget.Character or not currentTarget.Character.PrimaryPart or not (checkTeam(currentTarget, "outlaw") or checkTeam(currentTarget, "criminal")) then
               local closestDist = math.huge
+              local newTarget = nil
+              
               for _, p in ipairs(Players:GetPlayers()) do
-                  if p ~= LocalPlayer and p.Team and string.find(string.lower(p.Team.Name), "outlaw") then
+                  if p ~= LocalPlayer and (checkTeam(p, "outlaw") or checkTeam(p, "criminal")) then
                       if p.Character and p.Character.PrimaryPart then
-                          local targetPos = p.Character.PrimaryPart.Position
-                          -- KRİTİK ÇÖZÜM: Hedefin koordinatı denizin dibi (0,0,0) ise onu yoksay
-                          if targetPos.Magnitude > 50 then 
-                              local d = (char.PrimaryPart.Position - targetPos).Magnitude
+                          local tPos = p.Character:GetPivot().Position
+                          -- Okyanus (0,0,0) koruması: Yüklenmemiş adamı yoksay ki denize düşme
+                          if tPos.Magnitude > 10 then 
+                              local d = (char:GetPivot().Position - tPos).Magnitude
                               if d < closestDist then
                                   closestDist = d
-                                  currentTarget = p
+                                  newTarget = p
                               end
                           end
                       end
                   end
               end
+              currentTarget = newTarget
           end
 
-          -- Hedefe Yapışma
+          -- 2. Hedefe Işınlan ve Yapış
           if currentTarget and currentTarget.Character and currentTarget.Character.PrimaryPart then
-              -- Işınlanmayı güvenli bir mesafeye yapıyoruz ki anti-cheat "ne oluyoruz" demesin
+              -- Milimetrik olarak adamın arkasına yapışır
               char:PivotTo(currentTarget.Character:GetPivot() * CFrame.new(0, 0, 3))
               
-              local p = currentTarget.Character:FindFirstChildWhichIsA("ProximityPrompt", true)
-              if p then fireproximityprompt(p) end
+              local prompt = currentTarget.Character:FindFirstChildWhichIsA("ProximityPrompt", true)
+              if prompt then 
+                  fireproximityprompt(prompt) 
+              end
           end
       end)
    end,
