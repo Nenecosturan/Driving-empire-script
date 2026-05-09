@@ -4,16 +4,17 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
 local Window = Rayfield:CreateWindow({
-   Name = "Driving Empire Mobile Pro",
-   LoadingTitle = "Hatalar Temizleniyor...",
-   LoadingSubtitle = "Senin Tespitinle Düzeltildi Aga",
+   Name = "Driving Empire Mobile Elite",
+   LoadingTitle = "Sistem Optimize Ediliyor...",
+   LoadingSubtitle = "ATM Otomasyonu Aktif",
    ConfigurationSaving = {
       Enabled = true,
-      FolderName = "DrivingEmpireMobile",
+      FolderName = "DrivingEmpireMobileV3",
       FileName = "Config"
    }
 })
 
+-- Takım Kontrolü
 local function checkTeam(player, keyword)
     if player and player.Team then
         return string.find(string.lower(player.Team.Name), string.lower(keyword)) ~= nil
@@ -21,18 +22,19 @@ local function checkTeam(player, keyword)
     return false
 end
 
+-- Değişkenler
 local autoFarmATM = false
 local autoArrest = false
 local currentTarget = nil
 local arrestConnection = nil
 
 -- ==========================================
--- OUTLAW (MAHKUM) SEKMESİ - KÖKTEN ÇÖZÜLMÜŞ ATM
+-- OUTLAW (MAHKUM) SEKMESİ - FULL AUTO ATM
 -- ==========================================
 local OutlawTab = Window:CreateTab("Outlaw (Mahkum)", 4483362458) 
 
 OutlawTab:CreateToggle({
-   Name = "Auto ATM Farm",
+   Name = "Auto ATM Farm (Full Auto)",
    CurrentValue = false,
    Flag = "ATMFarm", 
    Callback = function(Value)
@@ -40,62 +42,50 @@ OutlawTab:CreateToggle({
       if autoFarmATM then
          task.spawn(function()
             while autoFarmATM do
-               task.wait(1.5) 
+               task.wait(1) 
                
                local char = LocalPlayer.Character
-               if not char or not char.PrimaryPart then continue end
+               local root = char and char:FindFirstChild("HumanoidRootPart")
+               if not root then continue end
 
                local targetPrompt = nil
-               local targetPhysicalPart = nil
+               local targetPart = nil
                local shortestDist = math.huge
-               local myPos = char:GetPivot().Position
 
-               -- ATM Taraması
+               -- Çevredeki ATM'leri ve Bust yazılarını tara
                for _, obj in ipairs(game.Workspace:GetDescendants()) do
-                   if obj:IsA("ProximityPrompt") then
-                       local actText = string.lower(obj.ActionText)
-                       local objText = string.lower(obj.ObjectText)
-                       local pName = string.lower(obj.Name)
-
-                       -- Kelime kontrolü (Senin attığın fotoğrafa göre Bust ve ATM)
-                       if string.find(actText, "bust") or string.find(actText, "rob") or string.find(objText, "atm") or string.find(pName, "atm") then
-                           if obj.Enabled then
-                               -- KRİTİK NOKTA: Objenin Attachment veya Part içinde olması fark etmeksizin asıl fiziksel bloğu bulur
-                               local physicalPart = obj:FindFirstAncestorWhichIsA("BasePart")
-                               
-                               if physicalPart then
-                                   local atmPos = physicalPart.Position
-                                   
-                                   -- Okyanus (0,0,0) koruması
-                                   if atmPos.Magnitude > 10 then 
-                                       local dist = (myPos - atmPos).Magnitude
-                                       if dist < shortestDist then
-                                           shortestDist = dist
-                                           targetPrompt = obj
-                                           targetPhysicalPart = physicalPart
-                                       end
-                                   end
+                   if obj:IsA("ProximityPrompt") and obj.Enabled then
+                       local txt = string.lower(obj.ActionText) .. string.lower(obj.ObjectText) .. string.lower(obj.Name)
+                       if string.find(txt, "bust") or string.find(txt, "atm") or string.find(txt, "rob") then
+                           local part = obj:FindFirstAncestorWhichIsA("BasePart")
+                           if part then
+                               local dist = (root.Position - part.Position).Magnitude
+                               if dist < shortestDist and part.Position.Magnitude > 500 then
+                                   shortestDist = dist
+                                   targetPrompt = obj
+                                   targetPart = part
                                end
                            end
                        end
                    end
                end
 
-               -- Işınlanma ve Etkileşim
-               if targetPrompt and targetPhysicalPart then
-                   -- ATM'nin fiziksel parçasının tam önüne ışınlan
-                   char:PivotTo(targetPhysicalPart.CFrame * CFrame.new(0, 1, 2.5))
+               -- Işınlanma ve Otomatik Basma
+               if targetPrompt and targetPart then
+                   -- ATM'nin tam önüne ve doğru açıyla ışınlan
+                   root.CFrame = targetPart.CFrame * CFrame.new(0, 0, 2.2)
+                   task.wait(0.3) -- Karakterin yerleşmesi için bekle
                    
-                   -- Haritanın yüklenmesi için kesin bekleme (Mobil cihazlar için önemli)
-                   task.wait(0.5)
-                   
-                   -- Mobil exploitlerde ProximityPrompt'un %100 tetiklenmesi için garanti yöntem
+                   -- Gelişmiş Etkileşim (Mobil Executor Uyumluluğu)
                    if targetPrompt.Enabled then
-                       fireproximityprompt(targetPrompt, 1) -- Bazı mobil executorlar için 1 parametresi tetiklemeyi zorlar
-                       task.wait(targetPrompt.HoldDuration + 0.5)
+                       -- 1. Yöntem: Standart Tetikleme
+                       fireproximityprompt(targetPrompt)
+                       
+                       -- 2. Yöntem (Yedek): Eğer HoldDuration varsa manuel basılı tutma simülasyonu
+                       if targetPrompt.HoldDuration > 0 then
+                           task.wait(targetPrompt.HoldDuration + 0.2)
+                       end
                    end
-               else
-                   print("Aga etrafta yüklü ATM yok. Lütfen haritada biraz dolaş.")
                end
             end
          end)
@@ -104,7 +94,7 @@ OutlawTab:CreateToggle({
 })
 
 -- ==========================================
--- SECURITY (POLİS) SEKMESİ (Bozmadık, Aynen Kalıyor)
+-- SECURITY (POLİS) SEKMESİ (Mükemmel Çalışan Kısım)
 -- ==========================================
 local SecurityTab = Window:CreateTab("Security (Polis)", 4483362458)
 
@@ -143,7 +133,7 @@ SecurityTab:CreateToggle({
                   if p ~= LocalPlayer and (checkTeam(p, "outlaw") or checkTeam(p, "criminal")) then
                       if p.Character and p.Character.PrimaryPart then
                           local tPos = p.Character:GetPivot().Position
-                          if tPos.Magnitude > 10 then 
+                          if tPos.Magnitude > 1000 then 
                               local d = (char:GetPivot().Position - tPos).Magnitude
                               if d < closestDist then
                                   closestDist = d
@@ -161,7 +151,7 @@ SecurityTab:CreateToggle({
               
               local prompt = currentTarget.Character:FindFirstChildWhichIsA("ProximityPrompt", true)
               if prompt then 
-                  fireproximityprompt(prompt, 1) 
+                  fireproximityprompt(prompt) 
               end
           end
       end)
