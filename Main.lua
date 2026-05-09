@@ -3,90 +3,92 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
 local Window = Rayfield:CreateWindow({
-   Name = "Driving Empire Special Hub",
-   LoadingTitle = "Sistem Yükleniyor...",
-   LoadingSubtitle = "Sorunsuz Sürüm",
+   Name = "Driving Empire Pro",
+   LoadingTitle = "Mekanikler Taranıyor...",
+   LoadingSubtitle = "Araç Fiziği Sürümü",
    ConfigurationSaving = {
       Enabled = true,
-      FolderName = "DrivingEmpireScript",
+      FolderName = "DrivingEmpire",
       FileName = "Config"
    }
 })
 
--- Değişkenler
+-- Arabayı bulma fonksiyonu (Kritik nokta: Sadece yaya değil, araba ışınlanmalı)
+local function getVehicle()
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("Humanoid") and char.Humanoid.SeatPart then
+        return char.Humanoid.SeatPart.Parent -- Karakterin oturduğu araba modelini çeker
+    end
+    return nil
+end
+
+-- Haritadaki gizli ATM'leri otomatik tarayan fonksiyon
+local function getATMs()
+    local atmList = {}
+    -- Bütün Workspace'i tarayıp model adında ATM veya Vault geçenleri bulur
+    for _, obj in ipairs(game.Workspace:GetDescendants()) do
+        if obj:IsA("Model") and (string.find(string.lower(obj.Name), "atm") or string.find(string.lower(obj.Name), "vault")) then
+            table.insert(atmList, obj)
+        end
+    end
+    return atmList
+end
+
 local autoFarmATM = false
 local autoArrest = false
-local maxMoney = 500000
-
--- Güvenli Bölge (Polis gelince buraya kaçacak - Harita dışı veya yüksek bir yer)
-local safeZoneCFrame = CFrame.new(0, 1000, 0) 
--- Para bırakma noktası (Oyun içindeki gerçek lokasyona göre değiştirilecek)
-local dropOffCFrame = CFrame.new(500, 50, -500) 
 
 local OutlawTab = Window:CreateTab("Outlaw (Mahkum)", 4483362458) 
 
 OutlawTab:CreateToggle({
-   Name = "Auto ATM Farm",
+   Name = "Auto ATM Farm (Arabada Olmalısın)",
    CurrentValue = false,
    Flag = "ATMFarm", 
    Callback = function(Value)
       autoFarmATM = Value
       if autoFarmATM then
          task.spawn(function()
+            local atms = getATMs() -- Script çalışınca ATM'leri hafızaya alır
+            
             while autoFarmATM do
-               task.wait(0.2)
+               task.wait(1)
                
-               -- Liderlik tablosundan anlık parayı çekme (Oyundaki isim "Cash" veya "Money" olabilir)
-               local currentMoney = 0
-               if LocalPlayer:FindFirstChild("leaderstats") and LocalPlayer.leaderstats:FindFirstChild("Cash") then
-                   currentMoney = LocalPlayer.leaderstats.Cash.Value
+               local vehicle = getVehicle()
+               if not vehicle then
+                   -- Eğer arabada değilsen script çalışmaz, bekler
+                   task.wait(2)
+                   continue
                end
 
-               -- 1. Para 500.000'e ulaştıysa teslimata git
-               if currentMoney >= maxMoney then
-                   if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                       LocalPlayer.Character.HumanoidRootPart.CFrame = dropOffCFrame
-                       task.wait(3) -- Parayı bırakması için zaman tanı
-                   end
-               else
-                   -- 2. Polis Kontrolü
-                   local policeNear = false
-                   for _, player in ipairs(Players:GetPlayers()) do
-                       -- Polis takımı rengi (Oyun içindeki tam renge göre ayarlanmalı)
-                       if player.TeamColor == BrickColor.new("Bright blue") and player ~= LocalPlayer then
-                           if player.Character and player.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                               local dist = (LocalPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
-                               if dist < 150 then
-                                   policeNear = true
-                                   break
-                               end
+               -- 1. Polis Yaklaşma Kontrolü
+               local policeNear = false
+               for _, player in ipairs(Players:GetPlayers()) do
+                   -- Takım adından veya meslekten polisi algıla
+                   if player.Team and player.Team.Name == "Security" and player ~= LocalPlayer then
+                       if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                           local myPos = vehicle:GetPivot().Position
+                           local dist = (myPos - player.Character.HumanoidRootPart.Position).Magnitude
+                           if dist < 250 then -- 250 birim güvenli mesafe
+                               policeNear = true
+                               break
                            end
                        end
                    end
+               end
 
-                   -- 3. Kaçış veya Soygun
-                   if policeNear then
-                       LocalPlayer.Character.HumanoidRootPart.CFrame = safeZoneCFrame
-                       task.wait(2) -- Güvenli bölgede bekle
-                   else
-                       -- Workspace'teki ATM'leri bulma
-                       local atmsFolder = game.Workspace:FindFirstChild("ATMs") -- Oyunun klasör ismine göre düzelt
-                       if atmsFolder then
-                           for _, atm in ipairs(atmsFolder:GetChildren()) do
-                               -- ATM sağlam mı kontrolü
-                               if atm:FindFirstChild("Broken") and atm.Broken.Value == false then
-                                   LocalPlayer.Character.HumanoidRootPart.CFrame = atm.PrimaryPart.CFrame
-                                   task.wait(0.5)
-                                   
-                                   -- ProximityPrompt (E tuşu) etkileşimi
-                                   local prompt = atm:FindFirstChildWhichIsA("ProximityPrompt", true)
-                                   if prompt then
-                                       fireproximityprompt(prompt)
-                                       task.wait(prompt.HoldDuration + 0.1) -- Soyulma süresi kadar bekle
-                                   end
-                                   break -- Sadece bir ATM'de işlem yapıp döngüyü başa sar
-                               end
-                           end
+               -- 2. Kaçış veya Işınlanma
+               if policeNear then
+                   -- Gökyüzüne, ulaşılamayacak bir yere arabayı ışınla
+                   vehicle:PivotTo(CFrame.new(0, 5000, 0))
+                   task.wait(3)
+               else
+                   if #atms > 0 then
+                       -- Rastgele bir ATM seç
+                       local targetATM = atms[math.random(1, #atms)]
+                       if targetATM and targetATM.PrimaryPart then
+                           -- Arabayı ATM'nin hemen yanına ışınla
+                           vehicle:PivotTo(targetATM.PrimaryPart.CFrame * CFrame.new(0, 0, 15))
+                           -- Oyunun kendi sayacının dolması veya paranın hesaba geçmesi için süre tanı
+                           task.wait(6) 
                        end
                    end
                end
@@ -99,7 +101,7 @@ OutlawTab:CreateToggle({
 local SecurityTab = Window:CreateTab("Security (Polis)", 4483362458)
 
 SecurityTab:CreateToggle({
-   Name = "Auto Arrest",
+   Name = "Auto Arrest (Kırmızı Çember Bekler)",
    CurrentValue = false,
    Flag = "AutoArrest",
    Callback = function(Value)
@@ -107,31 +109,37 @@ SecurityTab:CreateToggle({
       if autoArrest then
          task.spawn(function()
             while autoArrest do
-               task.wait(0.1)
+               task.wait(0.5)
+               local myVehicle = getVehicle()
                
+               -- Polisin de arabada olması şart
+               if not myVehicle then continue end
+
                local closestTarget = nil
                local shortestDistance = math.huge
-               local myPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position
+               local myPos = myVehicle:GetPivot().Position
 
-               if myPos then
-                   -- En yakın hırsızı bulma mantığı
-                   for _, target in ipairs(Players:GetPlayers()) do
-                       if target.TeamColor == BrickColor.new("Bright red") and target ~= LocalPlayer then
-                           if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-                               local dist = (myPos - target.Character.HumanoidRootPart.Position).Magnitude
+               -- En yakın hırsızın ARABASINI bulma
+               for _, target in ipairs(Players:GetPlayers()) do
+                   if target.Team and target.Team.Name == "Outlaws" and target ~= LocalPlayer then
+                       local targetChar = target.Character
+                       if targetChar and targetChar:FindFirstChild("Humanoid") and targetChar.Humanoid.SeatPart then
+                           local targetVeh = targetChar.Humanoid.SeatPart.Parent
+                           if targetVeh then
+                               local dist = (myPos - targetVeh:GetPivot().Position).Magnitude
                                if dist < shortestDistance then
                                    shortestDistance = dist
-                                   closestTarget = target
+                                   closestTarget = targetVeh
                                end
                            end
                        end
                    end
+               end
 
-                   -- Bulunan en yakın hedefe ışınlan
-                   if closestTarget then
-                       LocalPlayer.Character.HumanoidRootPart.CFrame = closestTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
-                       -- Arrest etkileşimi (Eğer polis oyunda "E" ile tutukluyorsa buraya fireproximityprompt eklenebilir)
-                   end
+               -- Hedef arabaya yapış ve çember dolana kadar orada kal
+               if closestTarget then
+                   -- Arabanın hemen arkasına ışınlan (Kırmızı çember mesafesi)
+                   myVehicle:PivotTo(closestTarget:GetPivot() * CFrame.new(0, 0, -12))
                end
             end
          end)
