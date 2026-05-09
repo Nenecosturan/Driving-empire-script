@@ -4,12 +4,12 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
 local Window = Rayfield:CreateWindow({
-   Name = "Driving Empire Elite V4",
-   LoadingTitle = "ATM Üstü Operasyon...",
-   LoadingSubtitle = "Hatasız Etkileşim Aktif",
+   Name = "Driving Empire Mobile V6",
+   LoadingTitle = "Menzil Hatası Çözüldü...",
+   LoadingSubtitle = "Kankanın Tespitiyle Düzenlendi",
    ConfigurationSaving = {
       Enabled = true,
-      FolderName = "DrivingEmpireV4",
+      FolderName = "DrivingEmpireV6",
       FileName = "Config"
    }
 })
@@ -37,14 +37,15 @@ local autoFarmATM = false
 local autoArrest = false
 local currentTarget = nil
 local arrestConnection = nil
+local ignoredATMs = {} 
 
 -- ==========================================
--- OUTLAW (MAHKUM) SEKMESİ - ATM ÜSTÜ SİSTEMİ
+-- OUTLAW (MAHKUM) SEKMESİ - MENZİL FİXLİ
 -- ==========================================
 local OutlawTab = Window:CreateTab("Outlaw (Mahkum)", 4483362458) 
 
 OutlawTab:CreateToggle({
-   Name = "Auto ATM Farm (Üstten Soygun)",
+   Name = "Auto ATM Farm (Yerden Etkileşim)",
    CurrentValue = false,
    Flag = "ATMFarm", 
    Callback = function(Value)
@@ -52,7 +53,7 @@ OutlawTab:CreateToggle({
       if autoFarmATM then
          task.spawn(function()
             while autoFarmATM do
-               task.wait(1) 
+               task.wait(0.5) 
                
                local char = LocalPlayer.Character
                local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -62,14 +63,15 @@ OutlawTab:CreateToggle({
                local targetPart = nil
                local shortestDist = math.huge
 
-               -- 1. ATM ve Buton Tarama
                for _, obj in ipairs(game.Workspace:GetDescendants()) do
                    if obj:IsA("ProximityPrompt") then
+                       if ignoredATMs[obj] and tick() < ignoredATMs[obj] then continue end 
+                       
                        local content = string.lower(obj.ActionText .. obj.ObjectText .. obj.Name)
                        if string.find(content, "bust") or string.find(content, "atm") or string.find(content, "rob") then
                            local part = obj.Parent:IsA("BasePart") and obj.Parent or obj:FindFirstAncestorWhichIsA("BasePart")
                            if part and part.Position.Y > -100 then
-                               if not isPoliceNear(part.Position, 200) then
+                               if not isPoliceNear(part.Position, 180) then
                                    local dist = (root.Position - part.Position).Magnitude
                                    if dist < shortestDist then
                                        shortestDist = dist
@@ -82,35 +84,44 @@ OutlawTab:CreateToggle({
                    end
                end
 
-               -- 2. Işınlanma ve "Zorlamalı" Soygun
                if targetPrompt and targetPart then
-                   -- Kankam tam dediğin gibi: ATM'nin tam üstüne ışınlanıyoruz (3.5 stüd yukarısı)
-                   root.CFrame = targetPart.CFrame * CFrame.new(0, 3.5, 0) * CFrame.Angles(math.rad(-90), 0, 0)
+                   -- KANKANIN TESPİTİ UYGULANDI: Havaya değil, ATM'nin tam önüne, yere ve doğru menzile (2.5 stüd) ışınlan
+                   local frontPos = targetPart.CFrame * CFrame.new(0, 0, 2.5).Position
+                   root.CFrame = CFrame.lookAt(frontPos, targetPart.Position)
                    
-                   -- Karakteri dondur (Menzil hatası almamak için)
                    root.Anchored = true
-                   task.wait(0.4) -- Harita yüklemesi için kısa bir es
+                   task.wait(0.4) 
                    
-                   -- MOBİL FIX: Tuşa basma komutunu 3 kez hızlıca yolluyoruz ki kesin algılasın
-                   if targetPrompt.Enabled then
-                       fireproximityprompt(targetPrompt)
-                       task.wait(0.1)
-                       fireproximityprompt(targetPrompt)
+                   -- Eğer menzilde olmamıza rağmen buton hala gelmediyse boşuna bekleme, geç!
+                   if not targetPrompt.Enabled then
+                       ignoredATMs[targetPrompt] = tick() + 10 -- 10 saniye kara liste
+                       root.Anchored = false
+                       continue -- Döngüyü anında başa sar, donup kalmayı engeller
+                   end
+                   
+                   -- Buton geldiyse soygunu başlat
+                   fireproximityprompt(targetPrompt)
+                   
+                   local robTime = targetPrompt.HoldDuration > 0 and targetPrompt.HoldDuration or 3
+                   local elapsed = 0
+                   
+                   while elapsed < robTime + 0.5 and autoFarmATM do
+                       task.wait(0.5)
+                       elapsed = elapsed + 0.5
                        
-                       -- Soygun süresi boyunca bekle
-                       local robTime = targetPrompt.HoldDuration > 0 and targetPrompt.HoldDuration or 2.5
-                       local elapsed = 0
-                       while elapsed < robTime + 0.5 and autoFarmATM do
-                           task.wait(0.5)
-                           elapsed = elapsed + 0.5
-                           -- Polis gelirse kaç
-                           if isPoliceNear(root.Position, 150) then break end
+                       -- İşlemi garantiye almak için tetiklemeye devam et
+                       if targetPrompt.Enabled then
+                           fireproximityprompt(targetPrompt)
+                       else
+                           break -- Para alındıysa (buton kapandıysa) bekleme yapma
                        end
+                       
+                       if isPoliceNear(root.Position, 120) then break end
                    end
                    
                    root.Anchored = false
                else
-                   print("Şu an güvenli/yüklü ATM yok kanka.")
+                   task.wait(1)
                end
             end
          end)
@@ -118,12 +129,13 @@ OutlawTab:CreateToggle({
           if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
               LocalPlayer.Character.HumanoidRootPart.Anchored = false
           end
+          ignoredATMs = {}
       end
    end,
 })
 
 -- ==========================================
--- SECURITY (POLİS) SEKMESİ (Burası Zaten Efsane)
+-- SECURITY (POLİS) SEKMESİ 
 -- ==========================================
 local SecurityTab = Window:CreateTab("Security (Polis)", 4483362458)
 
