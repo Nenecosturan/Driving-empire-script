@@ -4,12 +4,12 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
 local Window = Rayfield:CreateWindow({
-   Name = "Driving Empire Ultimate",
+   Name = "Driving Empire Elite FINAL",
    LoadingTitle = "Sistem Derleniyor...",
-   LoadingSubtitle = "Hatasız Sürüm Aga",
+   LoadingSubtitle = "ATM Fix ve Performans Sürümü",
    ConfigurationSaving = {
       Enabled = true,
-      FolderName = "DrivingEmpireUlt",
+      FolderName = "DrivingEmpireFinal",
       FileName = "Config"
    }
 })
@@ -29,12 +29,12 @@ local currentTarget = nil
 local arrestConnection = nil
 
 -- ==========================================
--- OUTLAW (MAHKUM) SEKMESİ
+-- OUTLAW (MAHKUM) SEKMESİ - YENİLENEN ATM SİSTEMİ
 -- ==========================================
 local OutlawTab = Window:CreateTab("Outlaw (Mahkum)", 4483362458) 
 
 OutlawTab:CreateToggle({
-   Name = "Auto ATM Farm",
+   Name = "Auto ATM Farm (Gelişmiş Tarayıcı)",
    CurrentValue = false,
    Flag = "ATMFarm", 
    Callback = function(Value)
@@ -42,49 +42,58 @@ OutlawTab:CreateToggle({
       if autoFarmATM then
          task.spawn(function()
             while autoFarmATM do
-               task.wait(1.5) 
+               task.wait(1.2) -- Anti-cheat için dengeli bir süre
                
                local char = LocalPlayer.Character
                if not char or not char.PrimaryPart then continue end
 
-               local targetATM = nil
+               local targetPrompt = nil
                local shortestDist = math.huge
                local myPos = char:GetPivot().Position
 
-               -- Haritadaki ATM'leri güvenli şekilde (GetPivot ile) tara
+               -- ATM TESPİT ETME OPERASYONU (Daha Geniş Kapsamlı)
                for _, obj in ipairs(game.Workspace:GetDescendants()) do
                    if obj:IsA("ProximityPrompt") then
-                       -- Kanka burası kritik: Ekran görüntüsündeki "Bust" kelimesini ekledik!
-                       local nameMatch = string.find(string.lower(obj.Name), "atm") or (obj.Parent and string.find(string.lower(obj.Parent.Name), "atm"))
-                       local textMatch = string.find(string.lower(obj.ActionText), "rob") or string.find(string.lower(obj.ActionText), "hack") or string.find(string.lower(obj.ActionText), "bust") or string.find(string.lower(obj.ObjectText), "atm")
+                       -- Kanka sadece isme değil, her şeye bakıyoruz:
+                       local nameCheck = string.find(string.lower(obj.Name), "atm") or (obj.Parent and string.find(string.lower(obj.Parent.Name), "atm"))
+                       local textCheck = string.find(string.lower(obj.ActionText), "bust") or string.find(string.lower(obj.ActionText), "rob") or string.find(string.lower(obj.ObjectText), "atm")
                        
-                       if (nameMatch or textMatch) and obj.Enabled and obj.Parent then
-                           local atmPos = obj.Parent:GetPivot().Position
+                       -- Eğer bunlardan biri tutuyorsa ve o an soyulabilirse (Enabled ise)
+                       if (nameCheck or textCheck) and obj.Enabled then
+                           local atmPart = obj.Parent:IsA("BasePart") and obj.Parent or obj.Parent:FindFirstChildWhichIsA("BasePart")
                            
-                           -- Okyanus dibi (0,0,0) koruması: Yüklenmemiş objeleri yoksay
-                           if atmPos.Magnitude > 300 then 
-                               local dist = (myPos - atmPos).Magnitude
-                               if dist < shortestDist then
-                                   shortestDist = dist
-                                   targetATM = obj
+                           if atmPart then
+                               local atmPos = atmPart.Position
+                               -- Okyanus (0,0,0) koruması
+                               if atmPos.Magnitude > 1000 then 
+                                   local dist = (myPos - atmPos).Magnitude
+                                   if dist < shortestDist then
+                                       shortestDist = dist
+                                       targetPrompt = obj
+                                   end
                                end
                            end
                        end
                    end
                end
 
-               if targetATM and targetATM.Parent then
-                   -- ATM'nin önüne güvenli ışınlanma
-                   char:PivotTo(targetATM.Parent:GetPivot() * CFrame.new(0, 2, 3))
-                   task.wait(0.5) 
-                   fireproximityprompt(targetATM)
-                   task.wait(targetATM.HoldDuration + 0.5)
+               if targetPrompt then
+                   local atmPart = targetPrompt.Parent
+                   -- ATM'nin tam dibine ama biraz havada ışınlan (Yerin dibine girmemek için)
+                   char:PivotTo(atmPart:GetPivot() * CFrame.new(0, 1.5, 2))
+                   
+                   -- Işınlandıktan hemen sonra bekleme (Çok önemli kanka)
+                   task.wait(0.3)
+                   
+                   -- Eğer hala Enabled ise etkileşime gir
+                   if targetPrompt.Enabled then
+                       fireproximityprompt(targetPrompt)
+                       -- Soygun bitene kadar karakteri orada sabitle
+                       task.wait(targetPrompt.HoldDuration + 0.5)
+                   end
                else
-                   Rayfield:Notify({
-                       Title = "ATM Aranıyor", 
-                       Content = "Yakında aktif ATM yok, haritayı biraz dolaş ki yenileri yüklensin.", 
-                       Duration = 3
-                   })
+                   -- Eğer bulamazsa ufak bir uyarı (Bunu silebilirsin çok kalabalık yaparsa)
+                   print("ATM aranıyor... Biraz dolaş ki harita yüklensin kanka.")
                end
             end
          end)
@@ -93,19 +102,19 @@ OutlawTab:CreateToggle({
 })
 
 -- ==========================================
--- SECURITY (POLİS) SEKMESİ (Burası Kusursuz, Ellenmedi)
+-- SECURITY (POLİS) SEKMESİ (Zaten Mükemmel Çalışan Kısım)
 -- ==========================================
 local SecurityTab = Window:CreateTab("Security (Polis)", 4483362458)
 
 SecurityTab:CreateToggle({
-   Name = "Auto Arrest",
+   Name = "Auto Arrest (Kilitlenme)",
    CurrentValue = false,
    Flag = "AutoArrest",
    Callback = function(Value)
       if Value and not (checkTeam(LocalPlayer, "security") or checkTeam(LocalPlayer, "police")) then
           Rayfield:Notify({
               Title = "Erişim Reddedildi!",
-              Content = "Bu özelliği açmak için Security takımında olman lazım.",
+              Content = "Aga bu özelliği açmak için Security veya Polis takımında olman lazım.",
               Duration = 4
           })
           autoArrest = false
@@ -132,7 +141,7 @@ SecurityTab:CreateToggle({
                   if p ~= LocalPlayer and (checkTeam(p, "outlaw") or checkTeam(p, "criminal")) then
                       if p.Character and p.Character.PrimaryPart then
                           local tPos = p.Character:GetPivot().Position
-                          if tPos.Magnitude > 300 then 
+                          if tPos.Magnitude > 1000 then 
                               local d = (char:GetPivot().Position - tPos).Magnitude
                               if d < closestDist then
                                   closestDist = d
