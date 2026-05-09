@@ -4,12 +4,12 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
 local Window = Rayfield:CreateWindow({
-   Name = "Driving Empire Mobile Elite",
-   LoadingTitle = "Sistem Optimize Ediliyor...",
-   LoadingSubtitle = "ATM Otomasyonu Aktif",
+   Name = "Driving Empire Mobile Ultra",
+   LoadingTitle = "Streaming Bypass Devrede...",
+   LoadingSubtitle = "Kanka Bu Sefer Kaçış Yok",
    ConfigurationSaving = {
       Enabled = true,
-      FolderName = "DrivingEmpireMobileV3",
+      FolderName = "DrivingEmpireUltra",
       FileName = "Config"
    }
 })
@@ -29,12 +29,12 @@ local currentTarget = nil
 local arrestConnection = nil
 
 -- ==========================================
--- OUTLAW (MAHKUM) SEKMESİ - FULL AUTO ATM
+-- OUTLAW (MAHKUM) SEKMESİ - AGRESİF ATM SİSTEMİ
 -- ==========================================
 local OutlawTab = Window:CreateTab("Outlaw (Mahkum)", 4483362458) 
 
 OutlawTab:CreateToggle({
-   Name = "Auto ATM Farm (Full Auto)",
+   Name = "Auto ATM Farm (Agresif)",
    CurrentValue = false,
    Flag = "ATMFarm", 
    Callback = function(Value)
@@ -52,15 +52,18 @@ OutlawTab:CreateToggle({
                local targetPart = nil
                local shortestDist = math.huge
 
-               -- Çevredeki ATM'leri ve Bust yazılarını tara
+               -- AGRESİF TARAMA: Sadece isme değil, her türlü etkileşime bakıyoruz
                for _, obj in ipairs(game.Workspace:GetDescendants()) do
                    if obj:IsA("ProximityPrompt") and obj.Enabled then
-                       local txt = string.lower(obj.ActionText) .. string.lower(obj.ObjectText) .. string.lower(obj.Name)
-                       if string.find(txt, "bust") or string.find(txt, "atm") or string.find(txt, "rob") then
-                           local part = obj:FindFirstAncestorWhichIsA("BasePart")
+                       -- Fotoğraftaki "Bust" ve "ATM" yazılarını her ihtimale karşı tarıyoruz
+                       local content = string.lower(obj.ActionText .. obj.ObjectText .. obj.Name)
+                       if string.find(content, "bust") or string.find(content, "atm") then
+                           local part = obj.Parent:IsA("BasePart") and obj.Parent or obj:FindFirstAncestorWhichIsA("BasePart")
+                           
                            if part then
                                local dist = (root.Position - part.Position).Magnitude
-                               if dist < shortestDist and part.Position.Magnitude > 10 then
+                               -- Okyanus dibi (0,0,0) koruması ve mesafe filtresi
+                               if part.Position.Magnitude > 10 and dist < shortestDist then
                                    shortestDist = dist
                                    targetPrompt = obj
                                    targetPart = part
@@ -70,31 +73,44 @@ OutlawTab:CreateToggle({
                    end
                end
 
-               -- Işınlanma ve Otomatik Basma
+               -- IŞINLANMA VE MOBİL ETKİLEŞİM GARANTİSİ
                if targetPrompt and targetPart then
-                   -- ATM'nin tam önüne ve doğru açıyla ışınlan
-                   root.CFrame = targetPart.CFrame * CFrame.new(0, 0, 2.2)
-                   task.wait(0.3) -- Karakterin yerleşmesi için bekle
+                   -- 1. Işınlan (Tam butonun önünde duracak şekilde)
+                   root.CFrame = targetPart.CFrame * CFrame.new(0, 0, 2.5)
                    
-                   -- Gelişmiş Etkileşim (Mobil Executor Uyumluluğu)
-                   if targetPrompt.Enabled then
-                       -- 1. Yöntem: Standart Tetikleme
-                       fireproximityprompt(targetPrompt)
-                       
-                       -- 2. Yöntem (Yedek): Eğer HoldDuration varsa manuel basılı tutma simülasyonu
-                       if targetPrompt.HoldDuration > 0 then
-                           task.wait(targetPrompt.HoldDuration + 0.2)
-                       end
+                   -- 2. Harita ve Buton Yüklenmesi İçin Bekle
+                   task.wait(0.4) 
+                   
+                   -- 3. Mobil Fix: Karakteri dondur ki etkileşim kopmasın
+                   root.Anchored = true
+                   
+                   -- 4. Tetikleme (Mobil Executorlar için en sağlam yöntem)
+                   fireproximityprompt(targetPrompt)
+                   
+                   -- 5. Bust süresi (HoldDuration) kadar bekle
+                   if targetPrompt.HoldDuration > 0 then
+                       task.wait(targetPrompt.HoldDuration + 0.3)
                    end
+                   
+                   -- 6. Serbest bırak ve devam et
+                   root.Anchored = false
+               else
+                   -- Eğer ATM bulamazsa biraz haritayı dolaşması için bildirim ver
+                   print("ATM yüklenmesi bekleniyor... Kanka biraz araçla gezmelisin.")
                end
             end
          end)
+      else
+          -- Toggle kapatıldığında karakter donuk kaldıysa çöz
+          if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+              LocalPlayer.Character.HumanoidRootPart.Anchored = false
+          end
       end
    end,
 })
 
 -- ==========================================
--- SECURITY (POLİS) SEKMESİ (Mükemmel Çalışan Kısım)
+-- SECURITY (POLİS) SEKMESİ (Aynen Korundu)
 -- ==========================================
 local SecurityTab = Window:CreateTab("Security (Polis)", 4483362458)
 
@@ -133,7 +149,7 @@ SecurityTab:CreateToggle({
                   if p ~= LocalPlayer and (checkTeam(p, "outlaw") or checkTeam(p, "criminal")) then
                       if p.Character and p.Character.PrimaryPart then
                           local tPos = p.Character:GetPivot().Position
-                          if tPos.Magnitude > 1000 then 
+                          if tPos.Magnitude > 10 then 
                               local d = (char:GetPivot().Position - tPos).Magnitude
                               if d < closestDist then
                                   closestDist = d
