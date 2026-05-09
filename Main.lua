@@ -136,7 +136,7 @@ SecurityTab:CreateToggle({
                       if p.Character and p.Character.PrimaryPart then
                           local tPos = p.Character:GetPivot().Position
                           -- Okyanus (0,0,0) koruması: Yüklenmemiş adamı yoksay ki denize düşme
-                          if tPos.Magnitude > 10 then 
+                          if tPos.Magnitude > 300 then 
                               local d = (char:GetPivot().Position - tPos).Magnitude
                               if d < closestDist then
                                   closestDist = d
