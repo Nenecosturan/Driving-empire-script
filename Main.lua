@@ -4,12 +4,12 @@ local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
 local Window = Rayfield:CreateWindow({
-   Name = "Driving Empire - Phantom Security",
-   LoadingTitle = "No-Clip ve Radar Yükleniyor...",
-   LoadingSubtitle = "Engel Tanımayan Takip",
+   Name = "Driving Empire • A-S ",
+   LoadingTitle = "Loading source...",
+   LoadingSubtitle = "checking RADAR & players",
    ConfigurationSaving = {
       Enabled = true,
-      FolderName = "DE_Security",
+      FolderName = "Security",
       FileName = "Config"
    }
 })
@@ -62,18 +62,18 @@ end
 -- ==========================================
 -- SECURITY (POLİS) SEKMESİ - GELİŞMİŞ SÜRÜM
 -- ==========================================
-local SecurityTab = Window:CreateTab("Security (Polis)", 4483362458)
+local SecurityTab = Window:CreateTab("Security", 4483362458)
 
 SecurityTab:CreateToggle({
-   Name = "Auto Arrest (No-Clip & Global)",
+   Name = "Auto Arrest",
    CurrentValue = false,
    Flag = "AutoArrest",
    Callback = function(Value)
       -- Polis Değilse Engelle
       if Value and not (checkTeam(LocalPlayer, "security") or checkTeam(LocalPlayer, "police")) then
           Rayfield:Notify({
-              Title = "Yetki Reddedildi!",
-              Content = "Kanka bu Terminatör modunu açmak için Polis olman lazım.",
+              Title = "Denied!",
+              Content = "Join to security team for this feature",
               Duration = 4
           })
           autoArrest = false
