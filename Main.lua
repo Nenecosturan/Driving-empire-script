@@ -60,7 +60,7 @@ OutlawTab:CreateToggle({
                            local part = obj:FindFirstAncestorWhichIsA("BasePart")
                            if part then
                                local dist = (root.Position - part.Position).Magnitude
-                               if dist < shortestDist and part.Position.Magnitude > 500 then
+                               if dist < shortestDist and part.Position.Magnitude > 10 then
                                    shortestDist = dist
                                    targetPrompt = obj
                                    targetPart = part
