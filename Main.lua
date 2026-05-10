@@ -9,7 +9,7 @@ local Window = Rayfield:CreateWindow({
    LoadingSubtitle = "checking RADAR & players",
    Theme = "Amber",
    ConfigurationSaving = {
-      Enabled = true,
+   Enabled = true,
       FolderName = "Security",
       FileName = "Config"
    }
